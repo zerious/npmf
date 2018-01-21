@@ -1,0 +1,32 @@
+{
+  "name": "npmf",
+  "description": "No problem, melon farmer.",
+  "keywords": [
+    "npmf"
+  ],
+  "version": "0.0.1",
+  "main": "npmf.js",
+  "bin": {
+    "npmf": "npmf.js"
+  },
+  "homepage": "http://github.com/zerious/npmf",
+  "repository": "http://github.com/zerious/npmf.git",
+  "bugs": {
+    "url": "http://github.com/zerious/npmf/issues"
+  },
+  "author": {
+    "name": "Sam Eubank",
+    "email": "sameubank@gmail.com"
+  },
+  "license": "ISC",
+  "scripts": {
+    "test": "mocha",
+    "retest": "mocha --watch",
+    "cover": "istanbul cover _mocha",
+    "report": "open coverage/lcov-report/index.html",
+  },
+  "devDependencies": {
+    "power-assert": "1.4.4",
+    "standard": "10.0.3"
+  }
+}

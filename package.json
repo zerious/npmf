@@ -7,7 +7,8 @@
   "version": "0.0.1",
   "main": "npmf.js",
   "bin": {
-    "npmf": "npmf.js"
+    "npmf": "npmf.js",
+    "npmfs": "npmfs.js"
   },
   "homepage": "http://github.com/zerious/npmf",
   "repository": "http://github.com/zerious/npmf.git",
@@ -23,7 +24,7 @@
     "test": "mocha",
     "retest": "mocha --watch",
     "cover": "istanbul cover _mocha",
-    "report": "open coverage/lcov-report/index.html",
+    "report": "open coverage/lcov-report/index.html"
   },
   "devDependencies": {
     "power-assert": "1.4.4",

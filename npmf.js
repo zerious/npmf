@@ -42,7 +42,7 @@ function install () {
   connect()
   
   function use (map) {
-    // log(map)
+    log(map)
   } 
 }
 
@@ -189,7 +189,8 @@ function locate () {
     var list = interfaces[key]
     for (var i = 0; i < list.length; i++) {
       var ip = list[i]
-      if ((ip.family === 'IPv4') && !ip.internal) {
+      if ((ip.family === 'IPv4') && !ip.internal &&
+        ((ip.netmask === '255.255.255.0') || !ip.netmask)) {
         return ip.address
       }
     }

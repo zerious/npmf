@@ -1,7 +1,15 @@
-# NPM Fast
+# npmf
 
-[![NPM Version](https://badge.fury.io/js/npmf.png)](http://badge.fury.io/js/npmf)
-[![Build Status](https://travis-ci.org/zerious/npmf.png?branch=master)](https://travis-ci.org/zerious/npmf)
-[![Code Coverage](https://coveralls.io/repos/zerious/npmf/badge.png?branch=master)](https://coveralls.io/r/zerious/npmf)
-[![Dependencies](https://david-dm.org/zerious/npmf.png?theme=shields.io)](https://david-dm.org/zerious/npmf)
-[![Support](http://img.shields.io/gittip/zerious.png)](https://www.gittip.com/zerious/)
+**npmf** is an npm wrapper that can install faster, if you're sharing Wi-Fi with others who are using npmf.
+
+## Install & Use
+
+npm install --global npmf
+npmf install PACKAGE_NAME
+
+## How?
+When you install with **npmf**, it starts a server which builds a list of package versions from
+your npm & yarn caches, and servers on the same subnet can discover each other and share their
+version lists. When you `npmf install PACKAGE_NAME`, npmf uses your local server as an npm registry.
+If a version of PACKAGE_NAME is cached on a peer, your installation will fetch a tarball from the
+local network, rather than using external bandwidth.

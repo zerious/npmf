@@ -29,5 +29,50 @@
   "devDependencies": {
     "power-assert": "1.4.4",
     "standard": "10.0.3"
-  }
+  },
+  "eslintConfig": {
+    "parserOptions": {
+      "ecmaVersion": 8,
+      "ecmaFeatures": {
+        "jsx": true
+      }
+    },
+    "plugins": [
+      "vue"
+    ],
+    "extends": [
+      "plugin:vue/recommended",
+      "standard"
+    ],
+    "rules": {
+      "object-curly-spacing": [
+        "error",
+        "always"
+      ],
+      "array-bracket-spacing": [
+        "error",
+        "always"
+      ],
+      "max-len": [
+        "error",
+        {
+          "code": 100,
+          "comments": 100
+        }
+      ],
+      "max-params": [
+        "error",
+        {
+          "max": 3
+        }
+      ]
+    }
+  },
+  "eslintIgnore": [
+    "/coverage",
+    "/data",
+    "/dist",
+    "/node_modules"
+  ]
 }
+  

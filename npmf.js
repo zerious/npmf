@@ -1,66 +1,127 @@
 #! /usr/bin/env node
+
 var fs = require('fs')
 var os = require('os')
 var http = require('http')
 var zlib = require('zlib')
 var proc = require('child_process')
-var log = console.log
+
 var env = process.env
 var win = process.platform === 'win32'
 var home = win && env.USERPROFILE || env.HOME
+var local = '127.0.0.1'
 var ip = locate()
 var me = parseInt(ip.split('.')[3])
-var argv = process.argv
-var command = argv[2]
 var port = 23456
-var map = {}
-var peers = {}
+
+var tools
+var pathMap = {}
+var versionMap = {}
+var peerMap = {}
 var wait = 0
 var count = 0
-var finishedCount = 0
-var spawned = false
+var finishedCount
+var rebuildTimeout
 
-if (command === 'install' || command === 'i') {
-  install()
-} else if (command === 'serve') {
+var stringify = JSON.stringify
+var argv = process.argv
+var command = argv[2]
+var args = argv.slice(2)
+var verbose = args.indexOf('--verbose') >= 0
+var forked = false
+
+
+if (command === 'serve') {
   serve()
+} else if (!command) {
+  help()
 } else {
-  // TODO: Help.
+  spawn()
 }
 
-// Install a dependency.
-function install () {
+function debug () {
+  if (verbose) console.log.apply(console, arguments)
+}
+
+// Show help.
+function help () {
+  console.log('\nUsage: npmf <command>\n\n  where <command> is "serve" or any npm command.\n')
+}
+
+// Spawn a command.
+function spawn () {
   // Connect to localhost, or try again.
   var server
   function connect () {
-    poll(me, function (map) {
-      if (map) return use(map)
-      if (!server) server = proc.fork('npmf', ['serve'])
+    poll(me, function (data) {
+      if (data) return run()
+      if (!server) {
+        server = proc.fork('npmf', ['serve'])
+        forked = true
+      }
       setTimeout(connect, 1e3)
     })
   }
   connect()
   
-  function use (map) {
-    log(map)
-  } 
+  function run () {
+    args.push('--registry')
+    args.push('http://' + local + ':' + port)
+    var child = proc.spawn('npm', args, { cwd: process.cwd(), env: env })
+    child.stdout.on('data', function (chunk) {
+      process.stdout.write(chunk)
+    })
+    child.stderr.on('data', function (chunk) {
+      process.stderr.write(chunk)
+    })
+    child.on('exit', process.exit)
+  }
 }
 
 // Start the server.
 function serve () {
   // Listen for connections.
   http.createServer(function (req, res) {
-    if (req.url === '/') {
-      var out = {}
-      for (var name in map) {
-        out[name] = Object.keys(map[name])
+    var url = req.url.replace(/^\/+/, '')
+    var parts = url.split(/\//g)
+    var name = parts[0]
+    if (!url) {
+      return res.send(versionMap)
+    } else if (parts.length === 1) {
+      var paths = pathMap[name]
+      var peers = peerMap[name]
+      if (paths || peers) {
+        var max
+        var versions = {}
+        var maps = [ paths, peers ]
+        maps.forEach(function (map) {
+          for (var version in map) {
+            var data = { name: name, version: version }
+            versions[version] = data
+            max = version
+          }
+        })
+        var data = { 'dist-tags': { latest: max }, versions: versions }
+        debug('Sending: ' + stringify(data))
+        return res.send(data)
       }
-      res.send(out)
-    } else if (req.url === '/ping') {
-      res.end('pong')
+    } else if (parts[1] === '-') {
+      var file = parts[2]
+      var version = file.substring(name.length + 1, file.length - 4)
+      var path = pathMap[name][version]
+      if (path) {
+        debug('Streaming: ' + path)
+        return fs.createReadStream(path).pipe(res)
+      }
     }
+    clearTimeout(rebuildTimeout)
+    rebuildTimeout = setTimeout(rebuild, 1e3)
+    debug('Proxying: ' + url)
+    http.get('http://registry.npmjs.org/' + url, function (remote) {
+      remote.pipe(res)
+    })
   }).listen(port)
-  log('Listening (http://' + ip + ':' + port + ').')
+  debug('Listening: http://' + ip + ':' + port)
   
   // Discover neighbors.
   discover()
@@ -71,8 +132,8 @@ function serve () {
     if (newIp !== ip) {
       ip = newIp
       me = parseInt(ip.split('.')[3])
-      log('Network changed (' + ip + ').')
-      peers = {}
+      debug('Listening: ' + ip)
+      peerMap = {}
       discover()
     }
   }, 1e3)
@@ -85,14 +146,15 @@ function serve () {
 http.ServerResponse.prototype.send = function (data) {
   var res = this
   res.writeHead(200, { 'content-type': 'application/json', 'content-encoding': 'deflate' })
-  zlib.deflate(JSON.stringify(data), function (ignore, enc) {
+  zlib.deflate(stringify(data), function (ignore, enc) {
     res.end(enc)
   })
 }
 
 // Find the NPM and Yarn caches, and map their tarballs.
 function build () {
-  return [
+  finishedCount = 0
+  tools = [
     new Tool({
       name: 'npm',
       cmd: 'config list -l',
@@ -119,11 +181,18 @@ function build () {
       dive: function (dir) {
         var match = dir.match(/npm-(.+)-(\d+\.\d+\.\d+.*)-[\da-f]{40}$/)
         if (match) {
-          add(match[1], match[2], this.path + '/' + dir + '.yarn-tarball.tgz')
+          add(match[1], match[2], this.path + '/' + dir + '/.yarn-tarball.tgz')
         }
       }
     })
   ]
+}
+
+// Rebuild maps.
+function rebuild () {
+  tools.forEach(function (tool) {
+    tool.find()
+  })
 }
 
 // Generic package management tool.
@@ -133,10 +202,16 @@ function Tool (options) {
   wait++
   proc.exec(self.name + ' ' + self.cmd, function (ignore, out, err) {
     self.path = self.parse(out)
-    list(self.path, function (name) {
-      self.dive(name)
-    })
+    self.find()
     unwait()
+  })
+}
+
+// Traverse the a package installer's cache.
+Tool.prototype.find = function () {
+  var self = this
+  list(self.path, function (name) {
+    self.dive(name)
   })
 }
 
@@ -160,9 +235,9 @@ function list (dir, fn) {
   }
 }
 
-// Add a dependency version to the local map.
+// Add a dependency version to the local path map.
 function add (name, v, path) {
-  var versions = map[name] = map[name] || {}
+  var versions = pathMap[name] = pathMap[name] || {}
   if (typeof versions[v] !== 'string') {
     versions[v] = path
     count++
@@ -176,8 +251,12 @@ function unwait () {
 
 // Signal that we're finished loading from caches.
 function finish () {
+  versionMap = {}
+  for (var name in pathMap) {
+    versionMap[name] = Object.keys(pathMap[name])
+  }
   if (!finishedCount) {
-    log('Found ' + count + ' versions.')
+    debug('Found: ' + count + ' versions')
     finishedCount = count
   }
 }
@@ -195,15 +274,21 @@ function locate () {
       }
     }
   }
-  return '127.0.0.1'
+  return local
 }
 
 // Find NPMF peers on the same subnet.
 function discover () {
   for (var i = me + 1; i < me + 256; i++) {
-    poll(i % 256, function (data) {
+    poll(i % 256, function (data, i) {
       if (data) {
-        log(data)
+        for (var name in data) {
+          var peerVersions = peerMap[name] = peerMap[name] || {}
+          var dataVersions = data[name]
+          for (var v in dataVersions) {
+            if (typeof peerVersions[v] === 'undefined') peerVersions[v] = i
+          }
+        }
       }
     })
   }
@@ -218,13 +303,13 @@ function poll (i, fn) {
     res.pipe(inflate)
     inflate
       .on('data', function (chunk) { data += chunk })
-      .on('close', function () { fn(parse(data)) })
+      .on('end', function () { fn(parse(data), i) })
   })
 }
 
 // Get a JSON response from a peer.
 function get (i, path, fn) {
-  var host = ip.replace(/\d+$/, i)
+  var host = (i === me) ? local : ip.replace(/\d+$/, i)
   var url = 'http://' + host + ':' + port + path
-  http.get(url, fn).on('error', function () { fn() })
+  http.get(url, fn).on('error', function (err) { fn() })
 }

@@ -89,8 +89,11 @@ function serve () {
 
     // Respond to "/" with the full map of versions. 
     if (!url) {
-      var peer = req.connection.remoteAddress
-      debug('Pong: ' + peer)
+      var peer = req.ipv4()
+      var i = parseInt(peer.split('.')[3])
+      if (!peers[peer]) {
+        poll(i, peer)
+      }
       return res.send(versionMap)
 
     // Tell favicon requests to get lost.
@@ -164,6 +167,11 @@ http.ServerResponse.prototype.send = function (data) {
   zlib.deflate(stringify(data), function (ignore, enc) {
     res.end(enc)
   })
+}
+
+// Get the IPv4 address of an incoming request.
+http.IncomingMessage.prototype.ipv4 = function () {
+  return (this.connection.remoteAddress || local).replace(/^.*:/, '')
 }
 
 // Find the NPM and Yarn caches, and map their tarballs.

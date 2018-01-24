@@ -92,6 +92,7 @@ function serve () {
       var peer = req.ipv4()
       var i = parseInt(peer.split('.')[3])
       if (!peers[peer]) {
+        peers[peer] = true
         poll(i, peer)
       }
       return res.send(versionMap)

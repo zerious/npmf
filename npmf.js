@@ -54,7 +54,7 @@ function spawn () {
   // Connect to localhost, or try again.
   var server
   function connect () {
-    poll(local, function (data) {
+    poll(me, local, function (data) {
       if (data) return run()
       if (!server) {
         server = proc.fork('npmf', ['serve'])
@@ -89,6 +89,8 @@ function serve () {
 
     // Respond to "/" with the full map of versions. 
     if (!url) {
+      var peer = req.connection.remoteAddress
+      debug('Pong: ' + peer)
       return res.send(versionMap)
 
     // Tell favicon requests to get lost.
@@ -294,37 +296,38 @@ function locate () {
 function discover () {
   for (var i = me + 1; i < me + 256; i++) {
     var peer = ip.replace(/\d+$/, i % 256)
-    poll(peer, function (data, host) {
-      if (data) {
-        peers[host] = true
-        debug('Peers: ' + Object.keys(peers).join(', '))
-        for (var name in data) {
-          var peerVersions = peerMap[name] = peerMap[name] || {}
-          var dataVersions = data[name]
-          for (var v in dataVersions) {
-            if (typeof peerVersions[v] === 'undefined') peerVersions[v] = i
-          }
-        }
-      }
-    })
+    poll(i, peer)
   }
 }
 
 // Poll a peer.
-function poll (host, fn) {
-  get(host, '/', function (res) {
-    if (!res) return fn()
+function poll (i, peer) {
+  get(peer, '/', function (res) {
+    if (!res) return
     var inflate = zlib.createInflate()
     var data = ''
     res.pipe(inflate)
     inflate
       .on('data', function (chunk) { data += chunk })
-      .on('end', function () { fn(parse(data), host) })
+      .on('end', function () {
+        if (data) {
+          data = parse(data)
+          peers[peer] = true
+          debug('Peers: ' + Object.keys(peers).join(', '))
+          for (var name in data) {
+            var peerVersions = peerMap[name] = peerMap[name] || {}
+            var dataVersions = data[name]
+            for (var v in dataVersions) {
+              if (typeof peerVersions[v] === 'undefined') peerVersions[v] = i
+            }
+          }
+        }
+      })
   })
 }
 
 // Get a JSON response from a host.
-function get (host, path, fn) {
-  var url = 'http://' + host + ':' + port + path
+function get (peer, path, fn) {
+  var url = 'http://' + peer + ':' + port + path
   http.get(url, fn).on('error', function (err) { fn() })
 }

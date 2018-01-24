@@ -13,6 +13,7 @@ var local = '127.0.0.1'
 var ip = locate()
 var me = parseInt(ip.split('.')[3])
 var port = 23456
+var peers = {}
 
 var tools
 var pathMap = {}
@@ -53,7 +54,7 @@ function spawn () {
   // Connect to localhost, or try again.
   var server
   function connect () {
-    poll(me, function (data) {
+    poll(local, function (data) {
       if (data) return run()
       if (!server) {
         server = proc.fork('npmf', ['serve'])
@@ -85,15 +86,23 @@ function serve () {
     var url = req.url.replace(/^\/+/, '')
     var parts = url.split(/\//g)
     var name = parts[0]
+
+    // Respond to "/" with the full map of versions. 
     if (!url) {
       return res.send(versionMap)
+
+    // Tell favicon requests to get lost.
+    } else if (name === 'favicon.ico') {
+      return res.end()
+    
+    // If looking for information about a specific package, give a subset of what npmjs.org gives.
     } else if (parts.length === 1) {
-      var paths = pathMap[name]
-      var peers = peerMap[name]
-      if (paths || peers) {
+      var pathVersions = pathMap[name]
+      var peerVersions = peerMap[name]
+      if (pathVersions || peerVersions) {
         var max
         var versions = {}
-        var maps = [ paths, peers ]
+        var maps = [ pathVersions, peerVersions ]
         maps.forEach(function (map) {
           for (var version in map) {
             var data = { name: name, version: version }
@@ -102,21 +111,25 @@ function serve () {
           }
         })
         var data = { 'dist-tags': { latest: max }, versions: versions }
-        debug('Sending: ' + stringify(data))
+        debug('Serve: ' + stringify(data))
         return res.send(data)
       }
+    
+    // If looking for a tarball, stream it.
     } else if (parts[1] === '-') {
       var file = parts[2]
       var version = file.substring(name.length + 1, file.length - 4)
       var path = pathMap[name][version]
       if (path) {
-        debug('Streaming: ' + path)
+        debug('Stream: ' + path)
         return fs.createReadStream(path).pipe(res)
       }
     }
+
+    // If nothing matched, use registry.npmjs.org as a proxy.
     clearTimeout(rebuildTimeout)
     rebuildTimeout = setTimeout(rebuild, 1e3)
-    debug('Proxying: ' + url)
+    debug('Proxy: ' + url)
     http.get('http://registry.npmjs.org/' + url, function (remote) {
       remote.pipe(res)
     })
@@ -280,8 +293,11 @@ function locate () {
 // Find NPMF peers on the same subnet.
 function discover () {
   for (var i = me + 1; i < me + 256; i++) {
-    poll(i % 256, function (data, i) {
+    var peer = ip.replace(/\d+$/, i % 256)
+    poll(peer, function (data, host) {
       if (data) {
+        peers[host] = true
+        debug('Peers: ' + Object.keys(peers).join(', '))
         for (var name in data) {
           var peerVersions = peerMap[name] = peerMap[name] || {}
           var dataVersions = data[name]
@@ -295,21 +311,20 @@ function discover () {
 }
 
 // Poll a peer.
-function poll (i, fn) {
-  get(i, '/', function (res) {
+function poll (host, fn) {
+  get(host, '/', function (res) {
     if (!res) return fn()
     var inflate = zlib.createInflate()
     var data = ''
     res.pipe(inflate)
     inflate
       .on('data', function (chunk) { data += chunk })
-      .on('end', function () { fn(parse(data), i) })
+      .on('end', function () { fn(parse(data), host) })
   })
 }
 
-// Get a JSON response from a peer.
-function get (i, path, fn) {
-  var host = (i === me) ? local : ip.replace(/\d+$/, i)
+// Get a JSON response from a host.
+function get (host, path, fn) {
   var url = 'http://' + host + ':' + port + path
   http.get(url, fn).on('error', function (err) { fn() })
 }

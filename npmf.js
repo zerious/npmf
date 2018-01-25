@@ -153,6 +153,7 @@ function serve () {
       me = parseInt(ip.split('.')[3])
       debug('Listening: ' + ip)
       peerMap = {}
+      peers = {}
       discover()
     }
   }, 1e3)

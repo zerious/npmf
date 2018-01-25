@@ -3,9 +3,10 @@
 **npmf** is an npm wrapper that can install faster, if you're sharing Wi-Fi with others who are using npmf.
 
 ## Install & Use
-
+```
 npm install --global npmf
 npmf install PACKAGE_NAME
+```
 
 ## How?
 When you install with **npmf**, it starts a server which builds a list of package versions from

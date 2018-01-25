@@ -14,6 +14,7 @@ var ip = locate()
 var me = parseInt(ip.split('.')[3])
 var port = 23456
 var peers = {}
+var doNothing = function () {}
 
 var tools
 var pathMap = {}
@@ -68,6 +69,7 @@ function spawn () {
   function run () {
     args.push('--registry')
     args.push('http://' + local + ':' + port)
+    debug('Spawn: npm ' + args.join(' '))
     var child = proc.spawn('npm', args, { cwd: process.cwd(), env: env })
     child.stdout.on('data', function (chunk) {
       process.stdout.write(chunk)
@@ -93,7 +95,7 @@ function serve () {
       var i = parseInt(peer.split('.')[3])
       if (!peers[peer]) {
         peers[peer] = true
-        poll(i, peer)
+        poll(i, peer, doNothing)
       }
       return res.send(versionMap)
 
@@ -103,12 +105,13 @@ function serve () {
 
     // If looking for information about a specific package, give a subset of what npmjs.org gives.
     } else if (parts.length === 1) {
-      var pathVersions = pathMap[name]
-      var peerVersions = peerMap[name]
-      if (pathVersions || peerVersions) {
+      var versionPaths = pathMap[name]
+      var versionPeers = peerMap[name]
+      if (versionPaths || versionPeers) {
         var max
         var versions = {}
-        var maps = [ pathVersions, peerVersions ]
+        var maps = [ versionPaths, versionPeers ]
+        debug(maps)
         maps.forEach(function (map) {
           for (var version in map) {
             var data = { name: name, version: version }
@@ -262,7 +265,7 @@ function list (dir, fn) {
 
 // Add a dependency version to the local path map.
 function add (name, v, path) {
-  var versions = pathMap[name] = pathMap[name] || {}
+  var versions = pathMap[name] || (pathMap[name] = {})
   if (typeof versions[v] !== 'string') {
     versions[v] = path
     count++
@@ -306,32 +309,33 @@ function locate () {
 function discover () {
   for (var i = me + 1; i < me + 256; i++) {
     var peer = ip.replace(/\d+$/, i % 256)
-    poll(i, peer)
+    poll(i, peer, doNothing)
   }
 }
 
 // Poll a peer.
-function poll (i, peer) {
+function poll (i, peer, fn) {
   get(peer, '/', function (res) {
-    if (!res) return
+    if (!res) return fn()
     var inflate = zlib.createInflate()
     var data = ''
     res.pipe(inflate)
     inflate
       .on('data', function (chunk) { data += chunk })
       .on('end', function () {
-        if (data) {
+        if (data && (i !== me)) {
           data = parse(data)
           peers[peer] = true
           debug('Peers: ' + Object.keys(peers).join(', '))
           for (var name in data) {
-            var peerVersions = peerMap[name] = peerMap[name] || {}
+            var versionPeers = peerMap[name] || (peerMap[name] = {})
             var dataVersions = data[name]
-            for (var v in dataVersions) {
-              if (typeof peerVersions[v] === 'undefined') peerVersions[v] = i
-            }
+            dataVersions.forEach(function (v) {
+              if (typeof versionPeers[v] === 'undefined') versionPeers[v] = i
+            })
           }
         }
+        fn(data)
       })
   })
 }

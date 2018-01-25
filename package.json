@@ -20,14 +20,11 @@
   },
   "license": "ISC",
   "scripts": {
+    "dev": "nodemon npmf -- serve --verbose",
     "test": "mocha",
     "retest": "mocha --watch",
     "cover": "istanbul cover _mocha",
     "report": "open coverage/lcov-report/index.html"
-  },
-  "devDependencies": {
-    "power-assert": "1.4.4",
-    "standard": "10.0.3"
   },
   "eslintConfig": {
     "parserOptions": {
@@ -72,6 +69,8 @@
     "/data",
     "/dist",
     "/node_modules"
-  ]
+  ],
+  "dependencies": {
+    "ltl": "^0.3.1"
+  }
 }
-  

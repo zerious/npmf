@@ -316,7 +316,7 @@ function locate () {
 function discover () {
   for (var i = me + 1; i < me + 256; i++) {
     var peer = ip.replace(/\d+$/, i % 256)
-    poll(i, peer, doNothing)
+    poll(i % 256, peer, doNothing)
   }
 }
 

@@ -116,7 +116,7 @@ function serve () {
           for (var version in map) {
             var data = { name: name, version: version }
             if (map === versionPeers) {
-              var peer = ip.replace(/\d$/, map[version])
+              var peer = ip.replace(/\d+$/, map[version])
               data.dist = {
                 tarball: 'http://' + peer + ':' + port +
                   '/' + name + '/-/' + name + '-' + version + '.tgz'

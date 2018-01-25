@@ -15,7 +15,7 @@
   "eslint.autoFixOnSave": true,
 
   // Make sure .vue files' <script> blocks get linted.
-  "eslint.validate": [ "javascript", "vue" ],
+  "eslint.validate": [ "javascript" ],
 
   // Avoid "No newline at end of file" warnings in GitLab.
   "files.insertFinalNewline": true,

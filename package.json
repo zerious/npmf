@@ -7,8 +7,7 @@
   "version": "0.0.1",
   "main": "npmf.js",
   "bin": {
-    "npmf": "npmf.js",
-    "npmfs": "npmfs.js"
+    "npmf": "npmf.js"
   },
   "homepage": "http://github.com/zerious/npmf",
   "repository": "http://github.com/zerious/npmf.git",

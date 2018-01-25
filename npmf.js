@@ -64,7 +64,7 @@ function spawn () {
     })
   }
   connect()
-  
+
   function run () {
     args.push('--registry')
     args.push('http://' + local + ':' + port)
@@ -87,7 +87,7 @@ function serve () {
     var parts = url.split(/\//g)
     var name = parts[0]
 
-    // Respond to "/" with the full map of versions. 
+    // Respond to "/" with the full map of versions.
     if (!url) {
       var peer = req.ipv4()
       var i = parseInt(peer.split('.')[3])
@@ -100,7 +100,7 @@ function serve () {
     // Tell favicon requests to get lost.
     } else if (name === 'favicon.ico') {
       return res.end()
-    
+
     // If looking for information about a specific package, give a subset of what npmjs.org gives.
     } else if (parts.length === 1) {
       var pathVersions = pathMap[name]
@@ -120,7 +120,7 @@ function serve () {
         debug('Serve: ' + stringify(data))
         return res.send(data)
       }
-    
+
     // If looking for a tarball, stream it.
     } else if (parts[1] === '-') {
       var file = parts[2]
@@ -141,10 +141,10 @@ function serve () {
     })
   }).listen(port)
   debug('Listening: http://' + ip + ':' + port)
-  
+
   // Discover neighbors.
   discover()
-  
+
   // Rediscover neighbors after network changes.
   setInterval(function () {
     var newIp = locate()
@@ -162,7 +162,7 @@ function serve () {
   build()
 }
 
-// Send compressed JSON. 
+// Send compressed JSON.
 http.ServerResponse.prototype.send = function (data) {
   var res = this
   res.writeHead(200, { 'content-type': 'application/json', 'content-encoding': 'deflate' })
